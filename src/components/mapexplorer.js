@@ -1,7 +1,7 @@
 import React, {useState, useEffect, useMemo, useCallback} from 'react';
-import ChoroplethMap, {highlightRegionInMap} from './choropleth';
+import ChoroplethMap from './choropleth';
 import {MAP_TYPES, MAPS_DIR} from '../constants';
-import {formatDate} from '../utils/common-functions';
+import {formatDate, formatDateAbsolute} from '../utils/common-functions';
 import {formatDistance} from 'date-fns';
 
 const mapMeta = {
@@ -52,7 +52,7 @@ const mapMeta = {
     name: 'Delhi',
     geoDataFile: `${MAPS_DIR}/delhi.json`,
     mapType: MAP_TYPES.STATE,
-    graphObjectName: 'delhi_1997-2012_district',
+    graphObjectName: 'delhi_district',
   },
   Karnataka: {
     name: 'Karnataka',
@@ -76,7 +76,7 @@ const mapMeta = {
     name: 'Gujarat',
     geoDataFile: `${MAPS_DIR}/gujarat.json`,
     mapType: MAP_TYPES.STATE,
-    graphObjectName: 'gujarat_district_2011',
+    graphObjectName: 'gujarat_district',
   },
   Haryana: {
     name: 'Haryana',
@@ -124,7 +124,7 @@ const mapMeta = {
     name: 'Manipur',
     geoDataFile: `${MAPS_DIR}/manipur.json`,
     mapType: MAP_TYPES.STATE,
-    graphObjectName: 'manipur_pre2016_districts',
+    graphObjectName: 'manipur_district',
   },
   Meghalaya: {
     name: 'Meghalaya',
@@ -176,9 +176,9 @@ const mapMeta = {
   },
   Telangana: {
     name: 'Telangana',
-    geoDataFile: `${MAPS_DIR}/telugana.json`,
+    geoDataFile: `${MAPS_DIR}/telangana.json`,
     mapType: MAP_TYPES.STATE,
-    graphObjectName: 'telugana',
+    graphObjectName: 'telangana_district',
   },
   Tripura: {
     name: 'Tripura',
@@ -207,40 +207,15 @@ const mapMeta = {
   },
 };
 
-export default function ({
-  states,
-  stateDistrictWiseData,
-  stateHighlighted,
-  districtHighlighted,
-}) {
+export default function ({states, stateDistrictWiseData, regionHighlighted}) {
   const [selectedRegion, setSelectedRegion] = useState({});
   const [currentHoveredRegion, setCurrentHoveredRegion] = useState({});
   const [currentMap, setCurrentMap] = useState(mapMeta.India);
 
   useEffect(() => {
-    // setStates(props.states);
-    // setCurrentHoveredRegion()
-  }, [states]);
-
-  useEffect(() => {
     const region = getRegionFromState(states[1]);
     setCurrentHoveredRegion(region);
   }, [states]);
-
-  useEffect(() => {
-    if (stateHighlighted === null) {
-      highlightRegionInMap(null, currentMap.mapType);
-    } else {
-      if (stateHighlighted !== undefined) {
-        const newMap = mapMeta['India'];
-        setCurrentMap(newMap);
-        const regionHighlighted = getRegionFromState(stateHighlighted.state);
-        setCurrentHoveredRegion(regionHighlighted);
-        highlightRegionInMap(regionHighlighted.name, currentMap.mapType);
-        setSelectedRegion(regionHighlighted.name);
-      }
-    }
-  }, [stateHighlighted, currentMap.mapType]);
 
   if (!currentHoveredRegion) {
     return null;
@@ -307,19 +282,29 @@ export default function ({
   );
 
   useEffect(() => {
-    if (districtHighlighted === null) {
-      highlightRegionInMap(null, currentMap.mapType);
+    if (regionHighlighted === undefined) {
+      return;
+    } else if (regionHighlighted === null) {
+      setSelectedRegion(null);
       return;
     }
-    const newMap = mapMeta[districtHighlighted?.state.state];
-    if (!newMap) {
-      return;
+    const isState = !('district' in regionHighlighted);
+    if (isState) {
+      const newMap = mapMeta['India'];
+      setCurrentMap(newMap);
+      const region = getRegionFromState(regionHighlighted.state);
+      setCurrentHoveredRegion(region);
+      setSelectedRegion(region.name);
+    } else {
+      const newMap = mapMeta[regionHighlighted.state.state];
+      if (!newMap) {
+        return;
+      }
+      setCurrentMap(newMap);
+      setHoveredRegion(regionHighlighted.district, newMap);
+      setSelectedRegion(regionHighlighted.district);
     }
-    setCurrentMap(newMap);
-    setHoveredRegion(districtHighlighted?.district, newMap);
-    highlightRegionInMap(districtHighlighted?.district, currentMap.mapType);
-    setSelectedRegion(districtHighlighted?.district);
-  }, [districtHighlighted, currentMap.mapType, setHoveredRegion]);
+  }, [regionHighlighted, currentMap.mapType, setHoveredRegion]);
 
   const getRegionFromDistrict = (districtData, name) => {
     if (!districtData) {
@@ -368,18 +353,18 @@ export default function ({
   const {name, lastupdatedtime} = currentHoveredRegion;
 
   return (
-    <div className="MapExplorer fadeInUp" style={{animationDelay: '1.2s'}}>
+    <div className="MapExplorer fadeInUp" style={{animationDelay: '1.5s'}}>
       <div className="header">
-        <h1>{currentMap.name} Map</h1>
+        <h1>{currentMap.name}</h1>
         <h6>
-          Hover over a{' '}
-          {currentMap.mapType === MAP_TYPES.COUNTRY ? 'state' : 'district'} for
-          more details
+          {window.innerWidth <= 769 ? 'Tap' : 'Hover'} over a{' '}
+          {currentMap.mapType === MAP_TYPES.COUNTRY ? 'state/ut' : 'district'}{' '}
+          for more details
         </h6>
       </div>
 
       <div className="map-stats">
-        <div className="stats">
+        <div className="stats fadeInUp" style={{animationDelay: '2s'}}>
           <h5>Confirmed</h5>
           <div className="stats-bottom">
             <h1>{currentHoveredRegion.confirmed}</h1>
@@ -387,7 +372,10 @@ export default function ({
           </div>
         </div>
 
-        <div className="stats is-blue">
+        <div
+          className="stats is-blue fadeInUp"
+          style={{animationDelay: '2.1s'}}
+        >
           <h5>Active</h5>
           <div className="stats-bottom">
             <h1>{currentHoveredRegion.active || ''}</h1>
@@ -395,7 +383,10 @@ export default function ({
           </div>
         </div>
 
-        <div className="stats is-green">
+        <div
+          className="stats is-green fadeInUp"
+          style={{animationDelay: '2.2s'}}
+        >
           <h5>Recovered</h5>
           <div className="stats-bottom">
             <h1>{currentHoveredRegion.recovered || ''}</h1>
@@ -403,7 +394,10 @@ export default function ({
           </div>
         </div>
 
-        <div className="stats is-gray">
+        <div
+          className="stats is-gray fadeInUp"
+          style={{animationDelay: '2.3s'}}
+        >
           <h5>Deceased</h5>
           <div className="stats-bottom">
             <h1>{currentHoveredRegion.deaths || ''}</h1>
@@ -412,7 +406,7 @@ export default function ({
         </div>
       </div>
 
-      <div className="meta">
+      <div className="meta fadeInUp" style={{animationDelay: '2.4s'}}>
         <h2>{name}</h2>
         {lastupdatedtime && (
           <div
@@ -423,7 +417,13 @@ export default function ({
             }`}
           >
             <h6>Last Updated</h6>
-            <h3>
+            <h3
+              title={
+                isNaN(Date.parse(formatDate(lastupdatedtime)))
+                  ? ''
+                  : formatDateAbsolute(lastupdatedtime)
+              }
+            >
               {isNaN(Date.parse(formatDate(lastupdatedtime)))
                 ? ''
                 : formatDistance(
